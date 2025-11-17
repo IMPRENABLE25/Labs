@@ -1,0 +1,259 @@
+VIRTUALISATION DE MISE EN PLACE D'UN SERVEUR DE FICHIER
+
+Objectif : Mise en place d'un serveur de fichier superviser par un SIEM.
+
+Serveur Apache pour la gestion des fichiers (Installer sur Ubuntu Server)
+Zabbix pour la supervision.(Installer sur Ubuntu Desktop)
+
+ETAPE1 : UBUNTU DESKTOP(adresse Ip : 
+Mettre a jour les paquets: 
+	sudo apt update
+Installer les dependances : 
+	sudo apt install -y apache2 mysql-server php php-mysql libapache2-mod-php
+Installer zabbix: (zabbix  7.0)
+	wget https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb
+	dpkg -i zabbix-release_latest_7.0+ubuntu24.04_all.deb
+Demarrer le serveur Apache:
+	systemctl enable apache2
+Installer l'agent et autres dependance de zabbix: 
+	sudo apt install -y zabbix-server-mysql zabbix-frontend-php zabbix-apache-conf zabbix-sql-scripts zabbix-agent
+Installer mariadb: 
+	sudo apt install mariadb-server
+Demarrer le service :
+	systemctl enable mariadb
+	systemctl start mariadb
+
+Creer une base de donnee pour zabbix:
+	mysql -u root -p 
+	CREATE DATABASE ZABBIX;
+	CREATE USER 'nom_user'@'localhost' IDENTIFIED BY 'mot2passse';
+	GRANT ALL PRIVILEGES ON zabbix.* to 'nomutilisateur'@'localhost';
+	FLUSH PRIVILEGES;
+Importer le schema de la base de donnee de zabbix: 
+	zcat /usr/share/zabbix-sql-scripts/mysql/server.sql.gz | sudo mysql -u nomutilisateur -p mot2passe nomdelabasededonneer
+Configurer le fichier de serveur de zabbix 
+	sudo nano /etc/zabbix/zabbix_server.conf
+	Chercher la ligne: 'DBPassword=' et ajouter le mot de passe de la base de données (mot2passe).
+	DBName=zabbix
+	DBUser=zabbix
+DBPassword=mot_de_passe
+
+Redemarrer les services: 
+	sudo systemctl restart zabbix-server apache2 zabbix-agent
+	sudo systemctl enable zabbix-server apache2 zabbix-agent
+Test: 
+	Aller dans le navigateur de taper : http://localhost/zabbix
+	Admin: zabbix
+
+**************************************************************************************************************************	
+ETAPE2 : Sur Ubuntu Server
+Installer apache2 et ses dependances: 
+Creer le dossier de partage :
+	mkdir /var/www/shareddoc
+C'est dans le dossier "shareddoc" que se trouveras les fichiers a partager.
+DOnner les drois necessaire a ce dossier:
+	chown -R root:www-data /var/www/shareddoc/
+	chmod 755 -R /var/www/shareddoc/
+	chmod 2770 shareddoc/
+Creation des fichiers de configurations de partage de dossiers:
+	cd /etc/apache2/sites-availabes
+	nano partage.conf:
+		<VirtualHost *:80>
+		   DocumentRoot /var/www/shareddoc/
+		   ServerName sae.local
+
+
+		   <Directory "/var/www/shareddoc/" >
+		      Options Indexes FollowSymlinks
+		      AllowOverride All
+		      Require all granted
+		      AuthType Basic
+		      AuthName "Safe Zone"
+		      AuthUserFile /etc/apache2/.htpasswd
+		      Require valid-user
+		   </Directory>
+
+		   Errorlog ${APACHE_LOG_DIR}/partage_error.log
+		   CustomLog ${APACHE_LOG_DIR}/partage_access.log combined
+
+		</VirtualHost>
+Sauvegarder et quitter
+Activer le site : a2ensite partage.conf
+Redemarre apache : systemctl restart apache2
+MISE EN PLACE DU SYSTEME D'AUTHENTIFICATION POUR LE SERVEUR APACHE SUR UBUNTU SERVER
+Activer le module mod_auth_basic:
+	sudo a2enmod auth_basic
+	sudo systemctl restart apache2
+Installer le package apache2-utlils:
+	sudo apt install apache2-utils -y
+Creation des utilisateurs: 
+Creer le fichier .htpasswd:
+	sudo htpasswd -c /etc/apache2/.htpasswd nomutilisateur 
+	Pour ajouter les autres utilisateurs 
+	sudo htpasswd  /etc/apache2/.htpasswd user2
+	ainsi de suite....
+configuration de l'authentification
+Creer un fichier .htaccess et le deplacer dans le meme dossier que celui partager
+contenu de ce fichier: 
+	AuthType Basic
+    	AuthName "Espace sécurisé"
+   	AuthUserFile /etc/apache2/.htpasswd
+    	Require valid-user
+Ajouter egalement ces meme instruction dans le fichier de directory de partage et aussi changer le AllowOveride All	
+Redemarrer le serveur apache:
+	systemctl restart apache2
+Pour reintiliser le mot de passe : 
+sudo sudo htpasswd /chemin/vers/.htpasswd nomutilisateur 
+
+****************************************************************************************************************************************************
+CREATION D'UNE BASE DE DONNEES SUR MON UBUNTU DESKTOP POUR LA SAUVEGARDE DES LOGS ET DETECTIONS DES INTRUSIONS: 
+
+Creation d'une base de donnees avec les tables necessaires:
+	create database intrusions;
+	use intrusions;
+Creer des tables ici: la table alerts, intrusions, system_logs.
+Creer un utilisateur pour l'acces a distance:
+	CREATE USER 'userdistant'@'%' IDENTIFIED BY 'pwd';
+	GRANT ALL PRIVILEGES ON intrusions.* TO 'userdistant'@'%';
+	GRANT ALL PRIVILEGES ON zabbix.* TO 'userdistant'@'%';
+	Ou carrement faire: GRANT ALL PRIVILEGES ON *.* TO 'userdistant'@'%';
+	FLUSH PRIVILEGES;
+Creer le script qui va permettre a zabbix d'envoyer les alertes et autres donner dans la base de donnee:
+	nano nomdufichier.py
+	Contenu: 
+	#!/usr/bin/python3
+	import mysql.connector
+	import sys
+	import logging
+
+	# Configuration de logging
+	logging.basicConfig(
+	    filename="/var/log/zabbix_alerts.log",
+	    level=logging.INFO,
+	    format="%(asctime)s - %(levelname)s - %(message)s"
+	)
+
+	# Arguments passés par Zabbix
+	if len(sys.argv) < 4:
+	    logging.error("Usage: send_alert_to_db.py <subject> <message> <severity>")
+	    sys.exit(1)
+
+	subject = sys.argv[1]
+	message = sys.argv[2]
+	severity = sys.argv[3]
+
+	# Configuration de la base de données
+	db_config = {
+	    "host": "<IP_du_desktop>",
+	    "user": "userdistant",
+	    "password": "pwd",
+	    "database": "intrusions"
+	}
+
+	# Insérer une alerte dans la base de données
+	try:
+	    db = mysql.connector.connect(**db_config)
+	    cursor = db.cursor()
+	    sql = "
+		INSERT INTO alerts (alert_type, description, severity_level)
+		VALUES (%s, %s, %s)
+	    "
+	    values = (subject, message, severity)
+	    cursor.execute(sql, values)
+	    db.commit()
+	    logging.info(f"Alerte insérée avec succès : {subject}, {severity}")
+	except mysql.connector.Error as err:
+	    logging.error(f"Erreur lors de l'insertion dans la base de données : {err}")
+	finally:
+	    if cursor:
+		cursor.close()
+	    if db:
+		db.close()
+sauvegarder et le rendre executable.
+AU cas ou le fihier /var/log/zabbix_alerts.log definit dans le script n'existe pas, le creer soi meme:
+	sudo touch /var/log/zabbix_alerts.log
+	sudo chown zabbix:zabbix /var/log/zabbix_alerts.log
+	sudo chmod 664 /var/log/zabbix_alerts.log.
+Configurer zabbix :
+	Aller sur zabbix puis ajouter un media:
+	Type : script
+	Script name: nom du fichier .py creer dans alertscripts
+	Ajout Parametre: {EVENT.NAME} , {EVENT.MESSAGE}, {EVENT.SEVERITY}
+
+
+MISE EN PLACE DE LA SURVEILLANCE DU SERVEUR UBUNTU
+Installer l'agent zabbix sur ubuntu server:
+	apt install zabbix-agent
+Modifier le fichier de configuration de zabbix(il peut etre dans le usr ou le etc):
+	nano /etc/zabbix/zabbix_agentd.conf
+	Modifier les lignes :
+		Server=@ip sur lequel est installer zabbix(Ici mon desktop)
+		ServerActive=@ip sur lequel est installer zabbix(Ici mon desktop)
+		Hostname=Apache_Server (On peut modifier le nom comme on veut. Mais attention il sera utiliser plus tard).
+	systemctl restart zabbix-agent
+Permettre l'acces au fichier de log: sudo chmod 644 /var/log/apache2/acces.log
+Creation du fichier de configuration pour les alertes :
+Installer python et ces dependances sur le serveur :
+	sudo apt update
+	sudo apt install python3 python3-pip
+	pip3 install mysql-connector-python
+Creer un script :
+	nano /opt/nomdufichier.py
+	contenu du script :
+	import mysql.connector
+	import time
+
+	db = mysql.connector.connect(
+	    host="<IP_du_desktop>",
+	    user="userdistant",
+	    password="pwd",
+	    database="intrusion_logs"
+	)
+	cursor = db.cursor()
+
+	def insert_log(service_name, log_level, message):
+	    sql = "INSERT INTO system_logs (service_name, log_level, message) VALUES (%s, %s, %s)"
+	    values = (service_name, log_level, message)
+	    cursor.execute(sql, values)
+	    db.commit()
+
+	log_file_path = "/var/log/apache2/access.log"
+	with open(log_file_path, "r") as log_file:
+	    log_file.seek(0, 2)
+	    while True:
+		line = log_file.readline()
+		if not line:
+		    time.sleep(1)
+		    continue
+		insert_log("Apache", "INFO", line.strip())
+
+	cursor.close()
+	db.close()
+Rendre le script executable
+Pour automatiser le script, creer un service: 
+	cd /etc/systemd/system
+	nano nomduservice.service
+	contenu : 
+		[Unit]
+		Description=Transfert des logs Apache vers la base de données
+		After=network.target
+
+		[Service]
+		ExecStart=/usr/bin/python3 /opt/nomdufichier.py
+		Restart=always
+		User=root 
+
+		[Install]
+		WantedBy=multi-user.target
+Sauvegarder et puis : 
+	sudo systemctl daemon-reload
+	sudo systemctl enable send-apache-logs.service
+	sudo systemctl start send-apache-logs.service
+
+AJOUTER LE SERVEUR DANS ZABBIX POUR LA SUPERVISION
+Sur zabbix faire l'ajout de host : le nom est le nom preciser dans le hostname du fichier de conf de l'agent.Ensuite suivre les etapes.
+Dans Alertes creer, aller dans media et creer un media , cela definit la ou on veut que l'alerte sois envoyer
+Aller dans users et choisir le user qu'on veut et lui ajouter un ou plusieurs media( c'est la sortie de l'alerte ca.)
+Toujours dans Alertes aller dans Actions Triggers, creer une nouvelle en specifiant les conditions, l'operations et suivre les etapes. 
+Attention si cela doit renvoyer dans une base de donnee. Lors de l'ajout au niveau de Users: dans le champs send to: il faut mettre les options qu'on avait definit lors de la creation du media sinon le script ne s'execute pas. 
+
