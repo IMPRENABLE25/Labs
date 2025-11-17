@@ -1,0 +1,35 @@
+Objectif du projet
+
+Ce lab a été réalisé pour :
+
+-Comprendre le processus d’installation de Windows Server 2012
+-Configurer un environnement serveur fonctionnel
+-Préparer l’ajout de rôles d’infrastructure (AD DS, DNS, DHCP)
+-Pratiquer l’administration système Windows dans un contexte professionnel
+-Maîtriser les premières étapes d’un déploiement serveur en entreprise
+
+🔹 1. Installation du système
+Choix de l’édition Windows Server 2012 Standard
+Installation avec interface graphique (GUI)
+
+🔹 2. Configuration réseau
+Assignation d’une adresse IP statique
+Définition du nom de machine : SERVER-2012
+Paramétrage du DNS local
+
+🔹 3. Paramètres post-installation
+Activation du Remote Desktop (RDP)
+Mise à jour du système
+Vérification des services essentiels
+
+🧰 Rôles
+-Active Directory Domain Services (AD DS)
+-DNS Server
+-DHCP Server
+-Hyper V
+-IIS
+-Services de fichiers et stockage
+
+Gestion des utilisateurs 
+
+      
