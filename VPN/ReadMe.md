@@ -1,0 +1,79 @@
+Ce projet met en place un tunnel IPSec site-à-site entre deux pare-feux Cisco ASA dans un environnement GNS3.
+L’objectif est de permettre la communication sécurisée entre les réseaux 192.168.1.0/24 (Site 1) et 192.168.2.0/24 (Site 2).
+
+--------------Configuration ASA1-----------------
+interface GigabitEthernet0/0
+ nameif inside
+ security-level 100
+ ip address 192.168.1.1 255.255.255.0
+!
+interface GigabitEthernet0/1
+ nameif outside
+ security-level 0
+ ip address 10.0.3.2 255.255.255.0
+!
+route outside 0.0.0.0 0.0.0.0 10.0.3.1
+
+object network OBJ_LAN1
+ subnet 192.168.1.0 255.255.255.0
+object network OBJ_LAN2
+ subnet 192.168.2.0 255.255.255.0
+crypto ikev1 policy 10
+ authentication pre-share
+ encryption aes-256
+ hash sha
+ group 2
+ lifetime 86400
+tunnel-group 10.0.4.1 type ipsec-l2l
+tunnel-group 10.0.4.1 ipsec-attributes
+ ikev1 pre-shared-key qwerty
+crypto ipsec ikev1 transform-set MY_TSET esp-aes-256 esp-sha-hmac
+access-list VPN_ACL extended permit ip 192.168.1.0 255.255.255.0 192.168.2.0 255.255.255.0
+crypto map MY_MAP 10 match address VPN_ACL
+crypto map MY_MAP 10 set peer 10.0.4.1
+crypto map MY_MAP 10 set ikev1 transform-set MY_TSET
+crypto map MY_MAP interface outside
+nat (inside,outside) source static OBJ_LAN1 OBJ_LAN1 destination static OBJ_LAN2 OBJ_LAN2
+
+--------------Configuration ASA2-----------------
+interface GigabitEthernet0/0
+ nameif inside
+ security-level 100
+ ip address 192.168.2.1 255.255.255.0
+!
+interface GigabitEthernet0/1
+ nameif outside
+ security-level 0
+ ip address 10.0.4.1 255.255.255.0
+!
+route outside 0.0.0.0 0.0.0.0 10.0.4.2
+object network OBJ_LAN2
+ subnet 192.168.2.0 255.255.255.0
+object network OBJ_LAN1
+ subnet 192.168.1.0 255.255.255.0
+crypto ikev1 policy 10
+ authentication pre-share
+ encryption aes-256
+ hash sha
+ group 2
+ lifetime 86400
+ tunnel-group 10.0.3.2 type ipsec-l2l
+tunnel-group 10.0.3.2 ipsec-attributes
+ ikev1 pre-shared-key qwerty
+crypto ipsec ikev1 transform-set MY_TSET esp-aes-256 esp-sha-hmac
+access-list VPN_ACL extended permit ip 192.168.2.0 255.255.255.0 192.168.1.0 255.255.255.0
+crypto map MY_MAP 10 match address VPN_ACL
+crypto map MY_MAP 10 set peer 10.0.3.2
+crypto map MY_MAP 10 set ikev1 transform-set MY_TSET
+crypto map MY_MAP interface outside
+nat (inside,outside) source static OBJ_LAN2 OBJ_LAN2 destination static OBJ_LAN1 OBJ_LAN1
+
+--------------Vérification ASA1-----------------
+show crypto ikev1 sa
+show crypto ipsec sa
+ping 192.168.2.1 source inside
+
+--------------Vérification ASA1-----------------
+show crypto ikev1 sa
+show crypto ipsec sa
+ping 192.168.1.1 source inside
