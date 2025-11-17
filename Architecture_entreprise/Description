@@ -1,0 +1,59 @@
+Mise en place d’un réseau local sécurisé pour un PME
+
+FICHE DE TRAVAIL
+
+LAN1 Employés (VLAN 10) – postes de travail
+LAN2 Admin/IT (VLAN 20) – accès aux équipements réseau, serveurs
+LAN3 Invités Wi-Fi (VLAN 30) – accès Internet seulement
+DMZ (VLAN 40) – pour héberger :(sur pfsense : interface DMZ)
+Serveur Web (intranet/extranet)
+WAN – accès Internet via un routeur ou modem(sur pfsense : interface WAN)
+Chaque VLAN est relié à une interface sur le LAN
+
+Règles de sécurité:
+
+LAN (Employés - VLAN 10)
+✅ Autoriser accès à Internet (HTTP/HTTPS)
+✅ Accès aux services internes (Serveur AD, Fichier)
+❌ Interdire l’accès aux VLAN 20 (IT) et VLAN 30 (Invités)
+❌ Interdire accès direct à la DMZ
+
+LAN IT/Admin (VLAN 20)
+✅ Accès total à tous les VLANs pour administration
+✅ Accès à l'interface pfSense
+
+LAN Invités Wi-Fi (VLAN 30)
+✅ Accès Internet uniquement
+❌ Bloquer tout accès aux VLAN internes (10, 20, 40)
+
+DMZ (VLAN 40)
+✅ Autoriser accès HTTP/HTTPS depuis WAN (avec NAT et port forwarding)
+✅ Autoriser accès limité depuis LAN IT (pour admin)
+❌ Bloquer accès sortant vers LAN
+
+🔄 Surveillance renforcée (logs, alertes)
+
+WAN
+❌ Tout trafic entrant bloqué par défaut
+
+✅ Autoriser trafic NAT vers DMZ (ex. : port 80/443 vers serveur web)
+
+✅ Authentification :
+Serveur Radius pour WPA2/WPA3 Entreprise (SSID Employés)
+SSID "Invités" isolé (VLAN 30)
+✅ Filtrage :
+Filtrage MAC sur le Wi-Fi et switchs (optionnel)
+ACL sur les switchs pour contrôler le trafic
+
+
+Le serveur de Fichier sera dans le VLAN IT
+Il sera accessible depuis le VLAN Employés via des règles de pare-feu mikrotik bien définies.
+🎯 Accès à prévoir :
+✅ VLAN 10 (employés) → accès contrôlé (ex : SMB, FTP, SFTP selon ton protocole)
+❌ VLAN 30 (invités) → aucun accès
+✅ VLAN 20 (admin) → accès complet
+Activer le DHCP de chaque interface via pfsense
+
+
+
+
