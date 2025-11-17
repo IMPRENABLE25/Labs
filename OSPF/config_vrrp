@@ -1,0 +1,44 @@
+vrrp 
+le VRRRP est un protocole de redondance de routeur.
+Objectif : éviter qu’un LAN perde la passerelle par défaut si le routeur principal tombe.
+
+Attention tout les routeurs dans le même lan doivent avoir le même vrid 
+sur le master
+/interface vrrp add interface=(interface relier au lan switch) vrid=1 priority=120 
+/ip address add address=192.168.10.254/24 interface=vrrp1
+
+les backup (r2,r3)
+/interface vrrp add interface=ether-lan vrid=1 priority=100 
+/ip address add address=192.168.10.254/24 interface=vrrp1
+
+VRRP détaillé
+Sur Master 
+# IP physique sur l'interface LAN
+/ip address add address=192.168.10.1/24 interface=ether1 comment="R1 LAN"
+
+# Créer l'interface VRRP (VRID=10, priorité 150)
+# (optionnel) sync-connection-tracking=yes si tu veux tenter la synchro d'état
+/interface vrrp add name=vrrp-lan vrid=10 interface=ether1 priority=150 virtual-address=192.168.10.254 preemption-mode=yes sync-connection-tracking=yes
+
+
+sur backup (r2,r3)
+*R2
+/ip address add address=192.168.10.2/24 interface=ether1 comment="R2 LAN"
+/interface vrrp add name=vrrp-lan vrid=10 interface=ether1 priority=120 virtual-address=192.168.10.254 preemption-mode=yes sync-connection-tracking=yes
+
+*r3
+/ip address add address=192.168.10.3/24 interface=ether1 comment="R3 LAN"
+/interface vrrp add name=vrrp-lan vrid=10 interface=ether1 priority=100 virtual-address=192.168.10.254 preemption-mode=yes sync-connection-tracking=yes
+
+Vérification :
+/interface vrrp print
+
+
+Test de basculement : 
+ping -O -D -i 0.1 <adresss>
+
+Quand le basculement mais trop de temps à répondre : 
+-Eviter que les backups aient le même degré de priorité 
+-agir sur le temps de reprise "failover" (interval) le diminuer entre 200-300ms 
+-mettre le preempt en yes partout
+
