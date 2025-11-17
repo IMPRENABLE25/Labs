@@ -1,0 +1,46 @@
+Projet réaliser en utilisant des routeurs Mikrotik 
+Configuration:
+
+-Attribuer un routeur ID unique à chaque routeur du réseau
+-Areas (aires ) : On divise le réseau en zone pour limiter le traffic de mise à jour
+    Area 0 (backbone) : cœur du réseau obligatoire.
+-Mettre toutes les interfaces connectées aux autres routeurs dans Area 0 (backbone).
+
+Exemple(sur un R2): 
+    /routing ospf instance add name=default router-id=2.2.2.2
+    /routing ospf area add name=backbone area-id=0.0.0.0 instance=default
+   /routing ospf interface-template add area=backbone interfaces=ether1  # lien R1-R2
+/routing ospf interface-template add area=backbone interfaces=ether2  # lien R2-R3
+/routing ospf interface-template add networks=10.10.1.0/24 area=backbone #Ajouter le reseau lan
+
+Répéter la même chose sur tout ls routeurs . 
+
+Vérification:
+/routing ospf neighbor print  (Voisins OSPF)
+/ip route print where protocol=ospf  (Routes installées par OSPF)
+/routing ospf route print
+
+
+Couper un lien et observer la convergence OSPF avec routing ospf neighbor print et ip route print.
+
+Après avoir fixé un ip avec ifconfig:
+# 1. Configuration IP
+sudo ifconfig eth0 192.168.1.100 netmask 255.255.255.0
+
+# 2. Passerelle (gateway) - IMPORTANT
+sudo route add default gw 192.168.1.1 eth0
+
+# 3. Vérification
+ifconfig eth0
+route -n
+
+COMMANDE DE TROUBLESHOOTING 
+show ip ospf
+show ip ospf interface
+show ip ospf neighbor
+show ip route ospf
+show ip ospf database
+debug ip ospf events
+debug ip ospf adj
+
+
