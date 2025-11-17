@@ -1,0 +1,114 @@
+Installation de GLPI sur Ubuntu server
+
+sudo apt-get install apache2 php mariadb-server
+apt-get install php
+sudo apt-get install php-xml php-common php-json php-mysql php-mbstring php-curl php-gd php-intl php-zip php-bz2 php-imap php-apcu
+sudo apt-get install php-ldap
+Maintenant :
+sudo mysql_secure_installation
+changer le mot de passe,  supprimer les users anonymes,desactiver l'acces root a distance
+Creer une base de donnee dedier a GLPI et accessible par a utilisateur dedier
+sudo mysql -u root -p
+entrer le mp definit dans l'etape precedente
+Les requetes SQL pour creer la base de donnees ainsi que un utilisateur
+CREATE DATABASE nomdb_glpi;
+GRANT ALL PRIVILEGES ON name_gpli.* TO user_créé@localhost IDENTIFIED BY "mot_de_passe";
+FLUSH PRIVILEGES;
+EXIT
+Telecharger l'archive .tgz de GLPI(Ici c'est la version 10.0.10 qui est installer)
+wget https://github.com/glpi-project/glpi/releases/download/10.0.10/glpi-10.0.10.tgz 
+Decompresser le fichier et le deplacer dans le dossier /var/www
+sudo tar -xzvf glpi-10.0.10.tgz -C /var/www/
+Definir un utilisateur correspondant a Apache2 en tant que proprietaire des fichiers GLPI:
+sudo chown www-data /var/www/glpi/ -R 
+Creation des dossiers et de sorti des donnees de la racine web. cela va permettre de faire une installation securise de GLPI
+sudo mkdir /etc/glpi
+sudo chown www-data /etc/glpi/
+Deplacer le repertoire config de glpi vers ce nouveau dossier:
+sudo mv /var/www/glpi/config  /etc/glpi
+sudo mkdir /var/lib/glpi
+sudo chown www-data /var/lib/glpi/
+sudo mv /var/www/glpi/files  /var/lib/glpi
+sudo mkdir /var/log/glpi
+sudo chown www-data /var/log/glpi
+Creer des fichiers de configuration :
+sudo nano /var/www/glpi/inc/downstream.php
+	<?php 
+	define('GLPI_CONFIG_DIR', '/etc/glpi/');
+	if (file_exists(GLPI_CONFIG_DIR . '/local_define.php')) {
+		require_once GLPI_CONFIG_DIR . '/local_define.php';
+	}
+	?>
+Sauvegarder et quitter.
+sudo nano /etc/glpi/local_define.php
+	<?php
+	define('GLPI_VAR_DIR', '/var/lib/glpi/files');
+	define('GLPI_LOG_DIR' , '/var/log/glpi');
+	?>
+Sauvegarder et quitter. 
+Configuration de Apache2
+sudo nano /etc/apache2/sites-availables/support.it.connect.tech.conf
+	<VirtualHost *:80>
+	    ServerName support.it-connect.tech
+
+	    DocumentRoot /var/www/glpi/public
+
+	     		
+
+	    <Directory /var/www/glpi/public>
+		Require all granted
+
+		RewriteEngine On
+
+		# Redirect all requests to GLPI router, unless file exists.
+		RewriteCond %{REQUEST_FILENAME} !-f
+		RewriteRule ^(.*)$ index.php [QSA,L]
+	    </Directory>
+	</VirtualHost>
+Sauvegarde et quitter.
+Activer le site
+sudo a2enmod rewrite
+sudo a2ensite support.it-connect.tech.conf
+Desactiver le site par defaut :
+sudo a2dissite 000-default.conf
+Activer le module de rewrite pour pouvoir faire la reecriture des regles apres:
+sudo a2enmod rewrite
+sudo systemctl restart apache2
+
+UTILISATION DE PHP-FPM avec Apache2
+sudo apt-get install php-fpm	// Cela installera la derniere version de php approprier
+Activer les modules dans Apache2
+sudo a2enmod proxy_fcgi setenvif
+sudo a2enconf php8.1-fpm
+Verifier le status : 
+systemctl status php8.1-fpm
+systemctl enable php8.1-fpm
+sudo systemctl reload apache2
+Configurer php-fpm pour apache2
+sudo nano /etc/php/8.2/fpm/php.ini
+	dans ce fichier cherher l'option "session.cookie_httponly" et indiquer la valeur "ON" pour l'activer.
+Sauvegarder et quitter.
+Appliquer les modifications
+sudo systemctl restart php8.1-fpm.service
+Modifier notre virtualHost: 
+sudo nano /etc/apache2/sites-availables/support.it.connect.tech.conf
+	Ajouter apres la balise Directory: 
+	<FilesMatch \.php$>
+    		SetHandler "proxy:unix:/run/php/php8.1-fpm.sock|fcgi://localhost/"
+	</FilesMatch>
+Sauvegarder et quitter.
+Appliquer les changements:
+sudo systemctl restart apache2
+ATTENTION LE FICHIER INSTALL.PHP peut ne pas etre dans ce chemin par defaut, vous devez aller le chercher et alors modifier le chemin dans le virtualhost de apache.
+Installation DE GLPI
+Aller dans le navigateur et taper le server name specifier/install/install.php
+#MOn site : nom.domain/install/install.php
+Au cas contraire @ip du serveur:port/install/install.php 
+
+
+ Default logins / passwords are:
+
+    glpi/glpi for the administrator account
+    tech/tech for the technician account
+    normal/normal for the normal account
+    post-only/postonly for the postonly account
