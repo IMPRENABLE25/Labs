@@ -2,10 +2,13 @@ Ce projet met en place un tunnel IPSec site-à-site entre deux pare-feux Cisco A
 L’objectif est de permettre la communication sécurisée entre les réseaux 192.168.1.0/24 (Site 1) et 192.168.2.0/24 (Site 2).
 
 --------------Configuration ASA1-----------------
+
 interface GigabitEthernet0/0
  nameif inside
+  
  security-level 100
  ip address 192.168.1.1 255.255.255.0
+ 
 !
 interface GigabitEthernet0/1
  nameif outside
