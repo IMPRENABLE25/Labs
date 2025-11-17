@@ -1,1 +1,15 @@
 Installation du serveur de messagerie CITADEL sur Ubuntu Server (projet réaliser en virtuel)
+Se connecter directement sur le serveur ou via ssh 
+
+sudo apt update
+curl -O https://easyinstall.citadel.org/install
+chmod +x install
+sudo ./install
+Suivre les etapes et faire les spécifications selon le besoin
+Après l’installation aller dans le navigateur :
+addresse ip du serveur:le port de Webcit 
+Vérifier si le service de CITADEL est actif : 
+sudo systemctl status citadel.service
+
+Dans l’onglet “Administration” , activer les outils pour lutter contre les spams et les virus via email. 
+Faire tout les configurations désirées. 
