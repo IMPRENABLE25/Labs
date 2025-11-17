@@ -1,3 +1,6 @@
+Déploiement complet de GLPI pour la gestion de parc informatique et des demandes de support. 
+Le projet inclut l’installation du serveur, la configuration de la base de données, l’intégration de l’agent d’inventaire, la gestion des utilisateurs, ainsi que la mise en place d’un workflow de tickets.
+
 Installation de GLPI sur Ubuntu server
 
 sudo apt-get install apache2 php mariadb-server
